@@ -13,7 +13,7 @@ st.set_page_config(
 )
 
 RESULTS_FILE = "resultados_candidatos_ine.csv"
-LOGO_PATH = "Logo_INE.png"  # Asegúrate de subir este archivo al repositorio
+LOGO_PATH = "Logo_INE.png"  # Debe existir en el repositorio, junto a app.py
 
 
 # ---------------------------------------------------------
@@ -49,11 +49,11 @@ def guardar_resultado(registro: dict):
 
 def calcular_categoria(nota: float) -> str:
     """
-    Categoriza según nota final, siguiendo lógica típica:
+    Categoriza según nota final:
 
-    >= 5.5 → Recomendable
-    4.5–5.4 → Recomendable con observaciones
-    < 4.5 → No recomendable
+    >= 5.5 → Recomendable (A)
+    4.5–5.4 → Recomendable con observaciones (B)
+    < 4.5 → No recomendable (C)
     """
     if nota >= 5.5:
         return "Recomendable (A)"
@@ -67,7 +67,7 @@ def calcular_categoria(nota: float) -> str:
 # Funciones de scoring
 # ---------------------------------------------------------
 def puntaje_cognitivo(respuestas):
-    """respuestas: lista de True/False para ítems correctos."""
+    """respuestas: lista de True/False para ítems correctos. Devuelve 0–100."""
     if len(respuestas) == 0:
         return 0.0
     correctas = sum(respuestas)
@@ -139,7 +139,7 @@ CARGOS_INE = [
 
 
 # ---------------------------------------------------------
-# Cabecera – Modo INE
+# Cabecera – Modo INE (logo + título)
 # ---------------------------------------------------------
 col_logo, col_title = st.columns([1, 4])
 
@@ -364,7 +364,6 @@ if rol == "Postulante INE":
 
         st.write("---")
         if st.button("Finalizar evaluación y ver resultados"):
-            # Validación: todas las cognitivas deben estar respondidas
             if len(cog_resp) < 4:
                 st.error(
                     "Por favor responda todas las preguntas de la prueba de aptitudes cognitivas."
