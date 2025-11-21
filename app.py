@@ -12,17 +12,82 @@ st.set_page_config(
 )
 
 # --------------------------------------------------------------------
-# INICIALIZACIÓN SEGURA DE SESSION_STATE
+# BANCOS DE ÍTEMS (EJEMPLOS – REEMPLAZAR POR ÍTEMS REALES)
+# --------------------------------------------------------------------
+PREGUNTAS_COGNITIVAS = [
+    {
+        "id": 1,
+        "enunciado": "¿Qué número completa la serie 2, 4, 6, 8, ... ?",
+        "opciones": ["9", "10", "11", "12"],
+        "correcta": 1,  # índice de la opción correcta (0,1,2,3)
+    },
+    {
+        "id": 2,
+        "enunciado": "Si hoy es lunes, ¿qué día será en 3 días más?",
+        "opciones": ["Martes", "Miércoles", "Jueves", "Viernes"],
+        "correcta": 2,
+    },
+    {
+        "id": 3,
+        "enunciado": "Un encuestador aplica 5 encuestas por hora. ¿Cuántas aplicará en 4 horas?",
+        "opciones": ["10", "15", "20", "25"],
+        "correcta": 2,
+    },
+    {
+        "id": 4,
+        "enunciado": "Si 1 km equivale a 1.000 metros, ¿cuántos metros son 3,5 km?",
+        "opciones": ["2.500", "3.000", "3.500", "4.000"],
+        "correcta": 2,
+    },
+    {
+        "id": 5,
+        "enunciado": "En una tabla hay 4 filas y 3 columnas. ¿Cuántas celdas tiene en total?",
+        "opciones": ["7", "10", "12", "16"],
+        "correcta": 2,
+    },
+]
+
+PREGUNTAS_PSICO = [
+    "Me siento cómodo/a trabajando bajo presión de tiempo.",
+    "Me preocupo por revisar cuidadosamente los datos antes de enviarlos.",
+    "Me resulta fácil coordinarme con otras personas para cumplir una meta común.",
+    "Cuando algo cambia en el trabajo, me adapto rápidamente.",
+    "Me considero responsable con los plazos que se me asignan.",
+]
+
+PREGUNTAS_ESTILOS = [
+    "Prefiero trabajar principalmente:",
+    "Cuando tengo una tarea compleja, prefiero recibir instrucciones:",
+    "En relación con la supervisión directa, me siento más cómodo/a cuando:",
+    "Respecto a la toma de decisiones en terreno, prefiero:",
+]
+
+
+# --------------------------------------------------------------------
+# INICIALIZACIÓN DE SESSION_STATE
 # --------------------------------------------------------------------
 if "datos_postulante" not in st.session_state:
-    st.session_state["datos_postulante"] = None  # guardará un dict
+    st.session_state["datos_postulante"] = None
 
 if "postulante_registrado" not in st.session_state:
     st.session_state["postulante_registrado"] = False
 
 if "historial_postulantes" not in st.session_state:
-    # lista de dicts con todos los postulantes que han hecho demo
     st.session_state["historial_postulantes"] = []
+
+# Estado para prueba cognitiva
+if "indice_cog" not in st.session_state:
+    st.session_state["indice_cog"] = 0
+
+if "resultados_cog" not in st.session_state:
+    st.session_state["resultados_cog"] = None
+
+# Resultados de otros módulos (placeholder)
+if "resultados_psico" not in st.session_state:
+    st.session_state["resultados_psico"] = None
+
+if "resultados_estilos" not in st.session_state:
+    st.session_state["resultados_estilos"] = None
 
 
 # --------------------------------------------------------------------
@@ -33,8 +98,8 @@ def mostrar_encabezado():
 
     with col_logo:
         try:
-            logo = Image.open("Logo_INE.png")  # el archivo debe estar en la misma carpeta
-            st.image(logo, use_column_width=False)
+            logo = Image.open("Logo_INE.png")  # debe estar en la misma carpeta que app.py
+            st.image(logo, width=180)  # tamaño controlado
         except Exception:
             st.write("**INE**")
 
@@ -52,7 +117,7 @@ def mostrar_encabezado():
 
 
 # --------------------------------------------------------------------
-# VISTA: POSTULANTE INE
+# VISTA: POSTULANTE
 # --------------------------------------------------------------------
 def vista_postulante():
     st.subheader("Formulario de Evaluación Psicolaboral")
@@ -63,7 +128,6 @@ def vista_postulante():
     )
 
     with st.form(key="form_datos_postulante"):
-        # NOTA: las keys de widgets son todas distintas a "datos_postulante"
         rut = st.text_input("RUT (o ID):", key="rut_input")
         nombre = st.text_input("Nombre completo:", key="nombre_input")
         correo = st.text_input("Correo electrónico:", key="correo_input")
@@ -89,9 +153,7 @@ def vista_postulante():
 
         iniciar = st.form_submit_button("Iniciar evaluación")
 
-    # LÓGICA AL PRESIONAR "Iniciar evaluación"
     if iniciar:
-        # Validaciones básicas
         if not rut or not nombre or not correo:
             st.error("Por favor complete al menos RUT, nombre y correo electrónico.")
             st.session_state["postulante_registrado"] = False
@@ -102,7 +164,6 @@ def vista_postulante():
             st.session_state["postulante_registrado"] = False
             return
 
-        # Guardamos datos en session_state **sin usar keys de widgets**
         datos = {
             "rut": rut,
             "nombre": nombre,
@@ -115,11 +176,8 @@ def vista_postulante():
 
         st.session_state["datos_postulante"] = datos
         st.session_state["postulante_registrado"] = True
-
-        # También lo agregamos al historial para la vista administrador (demo)
         st.session_state["historial_postulantes"].append(datos)
 
-    # Si ya está registrado, mostramos mensaje y pasamos a las pruebas
     if st.session_state["postulante_registrado"]:
         st.success("Datos registrados. Continúe con las pruebas.")
         mostrar_bloque_pruebas()
@@ -128,14 +186,182 @@ def vista_postulante():
 
 
 # --------------------------------------------------------------------
-# BLOQUE DE PRUEBAS (DEMO)
+# MÓDULO: PRUEBA COGNITIVA COMPLETA
+# --------------------------------------------------------------------
+def modulo_prueba_cognitiva():
+    st.markdown("### Prueba Cognitiva – Versión Demo Extendida")
+    st.write(
+        "En esta prueba se presentan ítems de razonamiento lógico, cálculo sencillo y "
+        "resolución de problemas vinculados al trabajo de campo."
+    )
+
+    preguntas = PREGUNTAS_COGNITIVAS
+    n_preg = len(preguntas)
+
+    indice = st.session_state.get("indice_cog", 0)
+    indice = max(0, min(indice, n_preg - 1))
+    st.session_state["indice_cog"] = indice
+
+    pregunta = preguntas[indice]
+
+    st.write(f"**Pregunta {indice + 1} de {n_preg}**")
+    st.write(pregunta["enunciado"])
+
+    key_radio = f"cog_{pregunta['id']}"
+    opciones = pregunta["opciones"]
+
+    st.radio(
+        "Seleccione una alternativa:",
+        options=opciones,
+        key=key_radio,
+    )
+
+    col1, col2, col3 = st.columns(3)
+
+    if col1.button("◀ Anterior", disabled=(indice == 0)):
+        st.session_state["indice_cog"] = max(0, indice - 1)
+
+    if col2.button("Siguiente ▶", disabled=(indice == n_preg - 1)):
+        st.session_state["indice_cog"] = min(n_preg - 1, indice + 1)
+
+    if col3.button("Finalizar prueba"):
+        aciertos = 0
+        contestadas = 0
+        for p in preguntas:
+            key_resp = f"cog_{p['id']}"
+            resp = st.session_state.get(key_resp)
+            if resp is not None:
+                contestadas += 1
+                if resp == p["opciones"][p["correcta"]]:
+                    aciertos += 1
+
+        if contestadas == 0:
+            st.warning("Debe responder al menos una pregunta para calcular un puntaje.")
+        else:
+            puntaje = round(aciertos / n_preg * 100)
+            st.session_state["resultados_cog"] = {
+                "aciertos": aciertos,
+                "total": n_preg,
+                "puntaje": puntaje,
+            }
+
+    if st.session_state["resultados_cog"] is not None:
+        res = st.session_state["resultados_cog"]
+        st.success(
+            f"Resultado prueba cognitiva: {res['aciertos']} de {res['total']} "
+            f"aciertos ({res['puntaje']} puntos sobre 100)."
+        )
+
+
+# --------------------------------------------------------------------
+# MÓDULO: CUESTIONARIO PSICOLABORAL
+# --------------------------------------------------------------------
+def modulo_cuestionario_psicolaboral():
+    st.markdown("### Cuestionario Psicolaboral – Versión Demo Extendida")
+    st.write(
+        "Responda las siguientes afirmaciones indicando su grado de acuerdo, "
+        "donde 1 = Muy en desacuerdo y 5 = Muy de acuerdo."
+    )
+
+    respuestas = []
+    for i, texto in enumerate(PREGUNTAS_PSICO, start=1):
+        valor = st.slider(
+            texto,
+            min_value=1,
+            max_value=5,
+            value=3,
+            key=f"psico_{i}",
+        )
+        respuestas.append(valor)
+
+    if st.button("Guardar respuestas cuestionario"):
+        promedio = sum(respuestas) / len(respuestas)
+        st.session_state["resultados_psico"] = {
+            "promedio": round(promedio, 2),
+            "n_items": len(respuestas),
+        }
+
+    if st.session_state["resultados_psico"] is not None:
+        res = st.session_state["resultados_psico"]
+        st.info(
+            f"Promedio global del cuestionario: **{res['promedio']}** "
+            f"(sobre 5, en {res['n_items']} ítems)."
+        )
+
+
+# --------------------------------------------------------------------
+# MÓDULO: INVENTARIO DE ESTILOS LABORALES
+# --------------------------------------------------------------------
+def modulo_inventario_estilos():
+    st.markdown("### Inventario de Estilos Laborales – Versión Demo")
+    st.write(
+        "Este módulo recoge información sobre sus preferencias de trabajo y estilo "
+        "de funcionamiento en equipo."
+    )
+
+    opciones_trabajo = [
+        "Solo/a",
+        "En pareja",
+        "En equipos pequeños",
+        "En equipos grandes",
+    ]
+
+    respuestas_estilos = {}
+
+    respuestas_estilos["forma_trabajo"] = st.selectbox(
+        PREGUNTAS_ESTILOS[0],
+        opciones_trabajo,
+        key="est_1",
+    )
+
+    respuestas_estilos["instrucciones"] = st.selectbox(
+        PREGUNTAS_ESTILOS[1],
+        [
+            "Muy detalladas, paso a paso",
+            "Indicaciones generales y luego aclarar dudas",
+            "Indicaciones mínimas; prefiero decidir cómo hacerlo",
+        ],
+        key="est_2",
+    )
+
+    respuestas_estilos["supervision"] = st.selectbox(
+        PREGUNTAS_ESTILOS[2],
+        [
+            "Con supervisión frecuente",
+            "Con supervisión periódica",
+            "Con supervisión sólo cuando sea necesario",
+        ],
+        key="est_3",
+    )
+
+    respuestas_estilos["toma_decisiones"] = st.selectbox(
+        PREGUNTAS_ESTILOS[3],
+        [
+            "Consultando siempre a mi superior",
+            "Tomando decisiones dentro de los márgenes definidos",
+            "Tomando decisiones de forma autónoma y luego informando",
+        ],
+        key="est_4",
+    )
+
+    if st.button("Registrar preferencias (demo)"):
+        st.session_state["resultados_estilos"] = respuestas_estilos
+
+    if st.session_state["resultados_estilos"] is not None:
+        st.success("Preferencias registradas (demo).")
+        st.json(st.session_state["resultados_estilos"])
+
+
+# --------------------------------------------------------------------
+# BLOQUE GENERAL DE PRUEBAS
 # --------------------------------------------------------------------
 def mostrar_bloque_pruebas():
-    st.markdown("## Módulo de Pruebas Psicolaborales (Demo)")
+    st.markdown("## Módulo de Pruebas Psicolaborales")
 
     st.write(
-        "A continuación se presentan de forma simulada las pruebas que formarán parte "
-        "del proceso de evaluación psicolaboral. Esta versión es un **demo funcional**."
+        "A continuación se presentan, en formato demo, los módulos que conformarán la "
+        "evaluación psicolaboral automatizada. En la versión productiva se integrarán "
+        "bancos completos de ítems e informes automáticos."
     )
 
     tabs = st.tabs(
@@ -146,59 +372,18 @@ def mostrar_bloque_pruebas():
         ]
     )
 
-    # TAB 1: Prueba Cognitiva (demo)
     with tabs[0]:
-        st.markdown("### Prueba Cognitiva – Versión Demo")
-        st.write(
-            "En la versión final, aquí se presentarán ítems de razonamiento lógico, "
-            "memoria de trabajo y atención selectiva."
-        )
-        st.radio(
-            "Ejemplo: ¿Cuál número completa la serie 2, 4, 6, 8, ... ?",
-            options=["9", "10", "11", "12"],
-            index=1,
-            key="demo_cognitiva_1",
-        )
-        st.button("Enviar respuestas (demo)", key="btn_demo_cognitiva")
+        modulo_prueba_cognitiva()
 
-    # TAB 2: Cuestionario Psicolaboral (demo)
     with tabs[1]:
-        st.markdown("### Cuestionario Psicolaboral – Versión Demo")
-        st.write(
-            "Aquí se aplicarán escalas breves para evaluar ajuste al rol, "
-            "tolerancia a la presión, trabajo en equipo y responsabilidad."
-        )
-        st.slider(
-            "Me siento cómodo/a trabajando bajo presión de tiempo.",
-            min_value=1,
-            max_value=5,
-            key="demo_psico_1",
-        )
-        st.slider(
-            "Me considero una persona ordenada y meticulosa con los datos.",
-            min_value=1,
-            max_value=5,
-            key="demo_psico_2",
-        )
-        st.button("Guardar respuestas (demo)", key="btn_demo_psico")
+        modulo_cuestionario_psicolaboral()
 
-    # TAB 3: Inventario de Estilos Laborales (demo)
     with tabs[2]:
-        st.markdown("### Inventario de Estilos Laborales – Versión Demo")
-        st.write(
-            "En esta sección se recogerá información sobre preferencias de trabajo, "
-            "autonomía, liderazgo y relación con el equipo."
-        )
-        st.selectbox(
-            "Prefiero trabajar principalmente:",
-            ["Solo/a", "En pareja", "En equipos pequeños", "En equipos grandes"],
-            key="demo_estilos_1",
-        )
-        st.button("Registrar preferencias (demo)", key="btn_demo_estilos")
+        modulo_inventario_estilos()
 
     st.info(
-        "En la versión productiva, cada prueba generará puntajes e informes automáticos "
-        "que se enviarán al sistema del INE."
+        "En la versión definitiva, los resultados de cada módulo se integrarán en un "
+        "informe psicométrico global para el INE."
     )
 
 
@@ -209,11 +394,11 @@ def vista_administrador():
     st.subheader("Panel Administrador INE / Reclutador (Demo)")
 
     st.info(
-        "Esta vista está pensada para uso de profesionales del INE encargados del proceso "
-        "de reclutamiento. En la versión final se integrará autenticación segura."
+        "Esta vista está pensada para profesionales del INE encargados del proceso "
+        "de reclutamiento. En la versión final se integrará autenticación segura y "
+        "conexión con los sistemas internos del Instituto."
     )
 
-    # Autenticación simple de demo
     with st.expander("Acceso administrador (versión demo)"):
         usuario = st.text_input("Usuario:", key="admin_user")
         clave = st.text_input("Contraseña:", type="password", key="admin_pass")
@@ -221,7 +406,6 @@ def vista_administrador():
 
     autenticado = False
     if acceder:
-        # Credenciales de DEMO (puedes cambiarlas)
         if usuario == "admin" and clave == "ine2025":
             st.success("Acceso concedido. Bienvenido/a al panel administrador (demo).")
             autenticado = True
@@ -229,8 +413,6 @@ def vista_administrador():
             st.error("Credenciales incorrectas (demo). Intente nuevamente.")
             autenticado = False
 
-    # Para no obligarte a escribir siempre las credenciales en demo,
-    # también mostramos el panel si ya hubo accesos previos correctos.
     if autenticado or st.session_state["historial_postulantes"]:
         st.markdown("### Postulantes registrados en la sesión (demo)")
         if st.session_state["historial_postulantes"]:
