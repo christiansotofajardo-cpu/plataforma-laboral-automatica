@@ -1,6 +1,7 @@
 import streamlit as st
 from PIL import Image
 from datetime import datetime
+import pandas as pd
 
 # --------------------------------------------------------------------
 # CONFIGURACIÓN GENERAL DE LA PÁGINA
@@ -12,14 +13,14 @@ st.set_page_config(
 )
 
 # --------------------------------------------------------------------
-# BANCOS DE ÍTEMS (EJEMPLOS – REEMPLAZAR POR ÍTEMS REALES)
+# BANCOS DE ÍTEMS (EJEMPLOS – SOLO DEMO, NO TEST REAL)
 # --------------------------------------------------------------------
 PREGUNTAS_COGNITIVAS = [
     {
         "id": 1,
         "enunciado": "¿Qué número completa la serie 2, 4, 6, 8, ... ?",
         "opciones": ["9", "10", "11", "12"],
-        "correcta": 1,  # índice de la opción correcta (0,1,2,3)
+        "correcta": 1,
     },
     {
         "id": 2,
@@ -60,33 +61,50 @@ PREGUNTAS_ESTILOS = [
     "Cuando tengo una tarea compleja, prefiero recibir instrucciones:",
     "En relación con la supervisión directa, me siento más cómodo/a cuando:",
     "Respecto a la toma de decisiones en terreno, prefiero:",
+    "En un equipo de trabajo, suelo aportar más en:",
 ]
 
 
 # --------------------------------------------------------------------
 # INICIALIZACIÓN DE SESSION_STATE
 # --------------------------------------------------------------------
-if "datos_postulante" not in st.session_state:
-    st.session_state["datos_postulante"] = None
+def init_session_state():
+    if "datos_postulante" not in st.session_state:
+        st.session_state["datos_postulante"] = None
 
-if "postulante_registrado" not in st.session_state:
-    st.session_state["postulante_registrado"] = False
+    if "postulante_registrado" not in st.session_state:
+        st.session_state["postulante_registrado"] = False
 
-if "historial_postulantes" not in st.session_state:
-    st.session_state["historial_postulantes"] = []
+    if "historial_postulantes" not in st.session_state:
+        st.session_state["historial_postulantes"] = []
 
-# Estado para prueba cognitiva
-if "indice_cog" not in st.session_state:
+    # Estado prueba cognitiva
+    if "indice_cog" not in st.session_state:
+        st.session_state["indice_cog"] = 0
+
+    if "resultados_cog" not in st.session_state:
+        st.session_state["resultados_cog"] = None
+
+    # Resultados de otros módulos
+    if "resultados_psico" not in st.session_state:
+        st.session_state["resultados_psico"] = None
+
+    if "resultados_estilos" not in st.session_state:
+        st.session_state["resultados_estilos"] = None
+
+    # Estado administrador
+    if "admin_autenticado" not in st.session_state:
+        st.session_state["admin_autenticado"] = False
+
+
+init_session_state()
+
+
+def reset_pruebas_para_nuevo_postulante():
+    """Deja las pruebas en cero cuando entra un nuevo postulante."""
     st.session_state["indice_cog"] = 0
-
-if "resultados_cog" not in st.session_state:
     st.session_state["resultados_cog"] = None
-
-# Resultados de otros módulos (placeholder)
-if "resultados_psico" not in st.session_state:
     st.session_state["resultados_psico"] = None
-
-if "resultados_estilos" not in st.session_state:
     st.session_state["resultados_estilos"] = None
 
 
@@ -98,8 +116,8 @@ def mostrar_encabezado():
 
     with col_logo:
         try:
-            logo = Image.open("Logo_INE.png")  # debe estar en la misma carpeta que app.py
-            st.image(logo, width=180)  # tamaño controlado
+            logo = Image.open("Logo_INE.png")  # Debe estar en la misma carpeta que app.py
+            st.image(logo, width=140)
         except Exception:
             st.write("**INE**")
 
@@ -157,51 +175,48 @@ def vista_postulante():
         if not rut or not nombre or not correo:
             st.error("Por favor complete al menos RUT, nombre y correo electrónico.")
             st.session_state["postulante_registrado"] = False
-            return
-
-        if not acepta_uso_datos:
+        elif not acepta_uso_datos:
             st.error("Debe autorizar el uso de datos para continuar con la evaluación.")
             st.session_state["postulante_registrado"] = False
-            return
-
-        datos = {
-            "rut": rut,
-            "nombre": nombre,
-            "correo": correo,
-            "telefono": telefono,
-            "cargo": cargo,
-            "acepta_uso_datos": acepta_uso_datos,
-            "fecha_registro": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        }
-
-        st.session_state["datos_postulante"] = datos
-        st.session_state["postulante_registrado"] = True
-        st.session_state["historial_postulantes"].append(datos)
+        else:
+            datos = {
+                "rut": rut,
+                "nombre": nombre,
+                "correo": correo,
+                "telefono": telefono,
+                "cargo": cargo,
+                "acepta_uso_datos": acepta_uso_datos,
+                "fecha_registro": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            }
+            st.session_state["datos_postulante"] = datos
+            st.session_state["postulante_registrado"] = True
+            st.session_state["historial_postulantes"].append(datos)
+            reset_pruebas_para_nuevo_postulante()
 
     if st.session_state["postulante_registrado"]:
         st.success("Datos registrados. Continúe con las pruebas.")
         mostrar_bloque_pruebas()
+        mostrar_resumen_resultados()
     else:
         st.info("Complete el formulario y presione **Iniciar evaluación** para continuar.")
 
 
 # --------------------------------------------------------------------
-# MÓDULO: PRUEBA COGNITIVA COMPLETA
+# MÓDULO: PRUEBA COGNITIVA (5 ÍTEMS DEMO)
 # --------------------------------------------------------------------
 def modulo_prueba_cognitiva():
-    st.markdown("### Prueba Cognitiva – Versión Demo Extendida")
+    st.markdown("### 1. Prueba Cognitiva – Versión Demo (5 ítems)")
     st.write(
         "En esta prueba se presentan ítems de razonamiento lógico, cálculo sencillo y "
         "resolución de problemas vinculados al trabajo de campo."
     )
 
-    preguntas = PREGUNTAS_COGNITIVAS
+    preguntas = PREGUNTAS_COGNITIVAS  # 5 ítems demo
     n_preg = len(preguntas)
 
     indice = st.session_state.get("indice_cog", 0)
     indice = max(0, min(indice, n_preg - 1))
     st.session_state["indice_cog"] = indice
-
     pregunta = preguntas[indice]
 
     st.write(f"**Pregunta {indice + 1} de {n_preg}**")
@@ -218,32 +233,35 @@ def modulo_prueba_cognitiva():
 
     col1, col2, col3 = st.columns(3)
 
-    if col1.button("◀ Anterior", disabled=(indice == 0)):
-        st.session_state["indice_cog"] = max(0, indice - 1)
+    with col1:
+        if st.button("◀ Anterior", disabled=(indice == 0), key=f"btn_ant_{indice}"):
+            st.session_state["indice_cog"] = max(0, indice - 1)
 
-    if col2.button("Siguiente ▶", disabled=(indice == n_preg - 1)):
-        st.session_state["indice_cog"] = min(n_preg - 1, indice + 1)
+    with col2:
+        if st.button("Siguiente ▶", disabled=(indice == n_preg - 1), key=f"btn_sig_{indice}"):
+            st.session_state["indice_cog"] = min(n_preg - 1, indice + 1)
 
-    if col3.button("Finalizar prueba"):
-        aciertos = 0
-        contestadas = 0
-        for p in preguntas:
-            key_resp = f"cog_{p['id']}"
-            resp = st.session_state.get(key_resp)
-            if resp is not None:
-                contestadas += 1
-                if resp == p["opciones"][p["correcta"]]:
-                    aciertos += 1
+    with col3:
+        if st.button("Finalizar prueba", key="btn_final_cog"):
+            aciertos = 0
+            contestadas = 0
+            for p in preguntas:
+                key_resp = f"cog_{p['id']}"
+                resp = st.session_state.get(key_resp)
+                if resp is not None:
+                    contestadas += 1
+                    if resp == p["opciones"][p["correcta"]]:
+                        aciertos += 1
 
-        if contestadas == 0:
-            st.warning("Debe responder al menos una pregunta para calcular un puntaje.")
-        else:
-            puntaje = round(aciertos / n_preg * 100)
-            st.session_state["resultados_cog"] = {
-                "aciertos": aciertos,
-                "total": n_preg,
-                "puntaje": puntaje,
-            }
+            if contestadas == 0:
+                st.warning("Debe responder al menos una pregunta para calcular un puntaje.")
+            else:
+                puntaje = round(aciertos / n_preg * 100)
+                st.session_state["resultados_cog"] = {
+                    "aciertos": aciertos,
+                    "total": n_preg,
+                    "puntaje": puntaje,
+                }
 
     if st.session_state["resultados_cog"] is not None:
         res = st.session_state["resultados_cog"]
@@ -254,10 +272,10 @@ def modulo_prueba_cognitiva():
 
 
 # --------------------------------------------------------------------
-# MÓDULO: CUESTIONARIO PSICOLABORAL
+# MÓDULO: CUESTIONARIO PSICOLABORAL (5 ÍTEMS DEMO)
 # --------------------------------------------------------------------
 def modulo_cuestionario_psicolaboral():
-    st.markdown("### Cuestionario Psicolaboral – Versión Demo Extendida")
+    st.markdown("### 2. Cuestionario Psicolaboral – Versión Demo (5 ítems)")
     st.write(
         "Responda las siguientes afirmaciones indicando su grado de acuerdo, "
         "donde 1 = Muy en desacuerdo y 5 = Muy de acuerdo."
@@ -274,7 +292,7 @@ def modulo_cuestionario_psicolaboral():
         )
         respuestas.append(valor)
 
-    if st.button("Guardar respuestas cuestionario"):
+    if st.button("Guardar respuestas cuestionario", key="btn_guardar_psico"):
         promedio = sum(respuestas) / len(respuestas)
         st.session_state["resultados_psico"] = {
             "promedio": round(promedio, 2),
@@ -290,27 +308,25 @@ def modulo_cuestionario_psicolaboral():
 
 
 # --------------------------------------------------------------------
-# MÓDULO: INVENTARIO DE ESTILOS LABORALES
+# MÓDULO: INVENTARIO DE ESTILOS LABORALES (5 ÍTEMS DEMO)
 # --------------------------------------------------------------------
 def modulo_inventario_estilos():
-    st.markdown("### Inventario de Estilos Laborales – Versión Demo")
+    st.markdown("### 3. Inventario de Estilos Laborales – Versión Demo")
     st.write(
         "Este módulo recoge información sobre sus preferencias de trabajo y estilo "
         "de funcionamiento en equipo."
     )
 
-    opciones_trabajo = [
-        "Solo/a",
-        "En pareja",
-        "En equipos pequeños",
-        "En equipos grandes",
-    ]
-
     respuestas_estilos = {}
 
     respuestas_estilos["forma_trabajo"] = st.selectbox(
         PREGUNTAS_ESTILOS[0],
-        opciones_trabajo,
+        [
+            "Solo/a",
+            "En pareja",
+            "En equipos pequeños",
+            "En equipos grandes",
+        ],
         key="est_1",
     )
 
@@ -344,7 +360,21 @@ def modulo_inventario_estilos():
         key="est_4",
     )
 
-    if st.button("Registrar preferencias (demo)"):
+    respuestas_estilos["aporte_equipo"] = st.selectbox(
+        PREGUNTAS_ESTILOS[4],
+        [
+            "Organización y planificación",
+            "Relaciones y clima de equipo",
+            "Resolución de problemas",
+            "Gestión de tiempos y plazos",
+        ],
+        key="est_5",
+    )
+
+    if st.button("Registrar preferencias (demo)", key="btn_guardar_estilos"):
+        # Índice demo simple: porcentaje de completitud (siempre 5 ítems acá)
+        puntaje_demo = 100
+        respuestas_estilos["puntaje_demo"] = puntaje_demo
         st.session_state["resultados_estilos"] = respuestas_estilos
 
     if st.session_state["resultados_estilos"] is not None:
@@ -356,7 +386,7 @@ def modulo_inventario_estilos():
 # BLOQUE GENERAL DE PRUEBAS
 # --------------------------------------------------------------------
 def mostrar_bloque_pruebas():
-    st.markdown("## Módulo de Pruebas Psicolaborales")
+    st.markdown("## Módulo de Pruebas Psicolaborales (Demo)")
 
     st.write(
         "A continuación se presentan, en formato demo, los módulos que conformarán la "
@@ -388,6 +418,44 @@ def mostrar_bloque_pruebas():
 
 
 # --------------------------------------------------------------------
+# RESUMEN GRÁFICO DE RESULTADOS
+# --------------------------------------------------------------------
+def mostrar_resumen_resultados():
+    st.markdown("## Resumen Integrado de Resultados (Demo)")
+
+    resultados = {}
+
+    # Cognitivo: ya viene en escala 0–100
+    if st.session_state["resultados_cog"] is not None:
+        resultados["Prueba Cognitiva"] = st.session_state["resultados_cog"]["puntaje"]
+
+    # Psicolaboral: promedio 1–5 → 0–100
+    if st.session_state["resultados_psico"] is not None:
+        prom = st.session_state["resultados_psico"]["promedio"]
+        resultados["Cuestionario Psicolaboral"] = round(prom / 5 * 100)
+
+    # Estilos laborales: índice demo
+    if st.session_state["resultados_estilos"] is not None:
+        resultados["Estilos Laborales (demo)"] = st.session_state["resultados_estilos"].get(
+            "puntaje_demo", 100
+        )
+
+    if not resultados:
+        st.info("Aún no hay resultados suficientes para mostrar el resumen gráfico.")
+        return
+
+    df = pd.DataFrame(
+        {
+            "Módulo": list(resultados.keys()),
+            "Puntaje": list(resultados.values()),
+        }
+    ).set_index("Módulo")
+
+    st.bar_chart(df)
+    st.caption("Puntajes en escala 0–100 (demo). No representan resultados finales psicométricos.")
+
+
+# --------------------------------------------------------------------
 # VISTA: ADMINISTRADOR / RECLUTADOR
 # --------------------------------------------------------------------
 def vista_administrador():
@@ -402,18 +470,15 @@ def vista_administrador():
     with st.expander("Acceso administrador (versión demo)"):
         usuario = st.text_input("Usuario:", key="admin_user")
         clave = st.text_input("Contraseña:", type="password", key="admin_pass")
-        acceder = st.button("Ingresar (demo)", key="btn_admin_login")
+        if st.button("Ingresar (demo)", key="btn_admin_login"):
+            if usuario == "admin" and clave == "ine2025":
+                st.success("Acceso concedido. Bienvenido/a al panel administrador (demo).")
+                st.session_state["admin_autenticado"] = True
+            else:
+                st.error("Credenciales incorrectas (demo). Intente nuevamente.")
+                st.session_state["admin_autenticado"] = False
 
-    autenticado = False
-    if acceder:
-        if usuario == "admin" and clave == "ine2025":
-            st.success("Acceso concedido. Bienvenido/a al panel administrador (demo).")
-            autenticado = True
-        else:
-            st.error("Credenciales incorrectas (demo). Intente nuevamente.")
-            autenticado = False
-
-    if autenticado or st.session_state["historial_postulantes"]:
+    if st.session_state["admin_autenticado"]:
         st.markdown("### Postulantes registrados en la sesión (demo)")
         if st.session_state["historial_postulantes"]:
             st.dataframe(st.session_state["historial_postulantes"])
