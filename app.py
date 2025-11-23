@@ -59,7 +59,7 @@ PREGUNTAS_PSICO = [
 
 PREGUNTAS_ESTILOS = [
     "Prefiero trabajar principalmente:",
-    "Cuando tengo una tarea complejo, prefiero recibir instrucciones:",
+    "Cuando tengo una tarea compleja, prefiero recibir instrucciones:",
     "En relación con la supervisión directa, me siento más cómodo/a cuando:",
     "Respecto a la toma de decisiones en terreno, prefiero:",
     "En un equipo de trabajo, suelo aportar más en:",
@@ -101,7 +101,15 @@ init_session_state()
 
 
 def reset_pruebas_para_nuevo_postulante():
-    """Limpia el estado de pruebas cuando entra un nuevo postulante."""
+    """Limpia completamente widgets y resultados de pruebas para un nuevo postulante."""
+    keys_a_borrar = []
+    for key in st.session_state.keys():
+        if key.startswith("cog_") or key.startswith("psico_") or key.startswith("est_"):
+            keys_a_borrar.append(key)
+
+    for k in keys_a_borrar:
+        del st.session_state[k]
+
     st.session_state["indice_cog"] = 0
     st.session_state["resultados_cog"] = None
     st.session_state["resultados_psico"] = None
@@ -226,6 +234,14 @@ def vista_postulante():
     if st.session_state["postulante_registrado"]:
         st.success("Datos registrados. Continúe con las pruebas.")
         mostrar_bloque_pruebas_postulante()
+
+        st.markdown("---")
+        st.info("Si ya finalizó las pruebas de este postulante, puede registrar uno nuevo.")
+        if st.button("Registrar nuevo postulante", key="btn_nuevo_postulante"):
+            st.session_state["datos_postulante"] = None
+            st.session_state["postulante_registrado"] = False
+            reset_pruebas_para_nuevo_postulante()
+            st.experimental_rerun()
     else:
         st.info("Complete el formulario y presione **Iniciar evaluación** para continuar.")
 
@@ -557,14 +573,12 @@ def vista_administrador():
         )
         return
 
-    # Tabla de postulantes
     st.markdown("### Postulantes registrados en la sesión (demo)")
     if st.session_state["historial_postulantes"]:
         st.dataframe(st.session_state["historial_postulantes"])
     else:
         st.write("Aún no hay postulantes registrados en esta sesión de demo.")
 
-    # Selección de postulante para ver resultados
     if st.session_state["resultados_por_postulante"]:
         st.markdown("### Visualización de resultados por postulante (demo)")
 
@@ -583,7 +597,6 @@ def vista_administrador():
     else:
         st.info("Aún no hay resultados asociados a postulantes en esta sesión demo.")
 
-    # Exportación a Excel (CSV)
     st.markdown("### Exportar resultados (demo)")
     df_res = construir_dataframe_resultados_global()
     if df_res.empty:
