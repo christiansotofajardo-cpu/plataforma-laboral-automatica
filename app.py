@@ -285,6 +285,7 @@ def modulo_prueba_cognitiva():
             for p in preguntas:
                 key_resp = f"cog_{p['id']}"
                 resp = st.session_state.get(key_resp)
+
                 if resp is not None:
                     contestadas += 1
                     if resp == p["opciones"][p["correcta"]]:
@@ -590,6 +591,7 @@ def vista_administrador():
         seleccion = st.selectbox(
             "Seleccione un postulante para ver sus resultados:",
             options=opciones,
+            key="admin_selector_postulante"
         )
 
         if seleccion:
