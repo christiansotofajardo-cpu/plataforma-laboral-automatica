@@ -2,6 +2,7 @@ import streamlit as st
 from PIL import Image
 from datetime import datetime
 import pandas as pd
+import altair as alt
 
 # --------------------------------------------------------------------
 # CONFIGURACIÓN GENERAL DE LA PÁGINA
@@ -13,7 +14,7 @@ st.set_page_config(
 )
 
 # --------------------------------------------------------------------
-# BANCOS DE ÍTEMS (EJEMPLOS – SOLO DEMO, NO TEST REAL)
+# BANCOS DE ÍTEMS (DEMO – 5 POR MÓDULO)
 # --------------------------------------------------------------------
 PREGUNTAS_COGNITIVAS = [
     {
@@ -58,12 +59,11 @@ PREGUNTAS_PSICO = [
 
 PREGUNTAS_ESTILOS = [
     "Prefiero trabajar principalmente:",
-    "Cuando tengo una tarea compleja, prefiero recibir instrucciones:",
+    "Cuando tengo una tarea complejo, prefiero recibir instrucciones:",
     "En relación con la supervisión directa, me siento más cómodo/a cuando:",
     "Respecto a la toma de decisiones en terreno, prefiero:",
     "En un equipo de trabajo, suelo aportar más en:",
 ]
-
 
 # --------------------------------------------------------------------
 # INICIALIZACIÓN DE SESSION_STATE
@@ -78,19 +78,19 @@ def init_session_state():
     if "historial_postulantes" not in st.session_state:
         st.session_state["historial_postulantes"] = []
 
-    # Estado prueba cognitiva
+    # Estado interno de pruebas (no visible al postulante)
     if "indice_cog" not in st.session_state:
         st.session_state["indice_cog"] = 0
-
     if "resultados_cog" not in st.session_state:
         st.session_state["resultados_cog"] = None
-
-    # Resultados de otros módulos
     if "resultados_psico" not in st.session_state:
         st.session_state["resultados_psico"] = None
-
     if "resultados_estilos" not in st.session_state:
         st.session_state["resultados_estilos"] = None
+
+    # Resultados por postulante (clave: RUT)
+    if "resultados_por_postulante" not in st.session_state:
+        st.session_state["resultados_por_postulante"] = {}
 
     # Estado administrador
     if "admin_autenticado" not in st.session_state:
@@ -101,11 +101,40 @@ init_session_state()
 
 
 def reset_pruebas_para_nuevo_postulante():
-    """Deja las pruebas en cero cuando entra un nuevo postulante."""
+    """Limpia el estado de pruebas cuando entra un nuevo postulante."""
     st.session_state["indice_cog"] = 0
     st.session_state["resultados_cog"] = None
     st.session_state["resultados_psico"] = None
     st.session_state["resultados_estilos"] = None
+
+
+def get_rut_actual():
+    datos = st.session_state.get("datos_postulante")
+    if datos is None:
+        return None
+    return datos.get("rut")
+
+
+def asegurar_registro_postulante_en_resultados():
+    rut = get_rut_actual()
+    if rut is None:
+        return
+    if rut not in st.session_state["resultados_por_postulante"]:
+        st.session_state["resultados_por_postulante"][rut] = {
+            "datos": st.session_state["datos_postulante"],
+            "cognitivo": None,
+            "psico": None,
+            "estilos": None,
+        }
+
+
+def registrar_resultado(modulo: str, data: dict):
+    """Guarda resultados por postulante (solo para vista administrador)."""
+    rut = get_rut_actual()
+    if rut is None:
+        return
+    asegurar_registro_postulante_en_resultados()
+    st.session_state["resultados_por_postulante"][rut][modulo] = data
 
 
 # --------------------------------------------------------------------
@@ -116,7 +145,7 @@ def mostrar_encabezado():
 
     with col_logo:
         try:
-            logo = Image.open("Logo_INE.png")  # Debe estar en la misma carpeta que app.py
+            logo = Image.open("Logo_INE.png")  # Debe estar junto a app.py
             st.image(logo, width=140)
         except Exception:
             st.write("**INE**")
@@ -192,17 +221,17 @@ def vista_postulante():
             st.session_state["postulante_registrado"] = True
             st.session_state["historial_postulantes"].append(datos)
             reset_pruebas_para_nuevo_postulante()
+            asegurar_registro_postulante_en_resultados()
 
     if st.session_state["postulante_registrado"]:
         st.success("Datos registrados. Continúe con las pruebas.")
-        mostrar_bloque_pruebas()
-        mostrar_resumen_resultados()
+        mostrar_bloque_pruebas_postulante()
     else:
         st.info("Complete el formulario y presione **Iniciar evaluación** para continuar.")
 
 
 # --------------------------------------------------------------------
-# MÓDULO: PRUEBA COGNITIVA (5 ÍTEMS DEMO)
+# MÓDULOS DE PRUEBAS (POSTULANTE NO VE PUNTAJES)
 # --------------------------------------------------------------------
 def modulo_prueba_cognitiva():
     st.markdown("### 1. Prueba Cognitiva – Versión Demo (5 ítems)")
@@ -211,7 +240,7 @@ def modulo_prueba_cognitiva():
         "resolución de problemas vinculados al trabajo de campo."
     )
 
-    preguntas = PREGUNTAS_COGNITIVAS  # 5 ítems demo
+    preguntas = PREGUNTAS_COGNITIVAS
     n_preg = len(preguntas)
 
     indice = st.session_state.get("indice_cog", 0)
@@ -254,7 +283,7 @@ def modulo_prueba_cognitiva():
                         aciertos += 1
 
             if contestadas == 0:
-                st.warning("Debe responder al menos una pregunta para calcular un puntaje.")
+                st.warning("Debe responder al menos una pregunta para registrar la prueba.")
             else:
                 puntaje = round(aciertos / n_preg * 100)
                 st.session_state["resultados_cog"] = {
@@ -262,18 +291,10 @@ def modulo_prueba_cognitiva():
                     "total": n_preg,
                     "puntaje": puntaje,
                 }
-
-    if st.session_state["resultados_cog"] is not None:
-        res = st.session_state["resultados_cog"]
-        st.success(
-            f"Resultado prueba cognitiva: {res['aciertos']} de {res['total']} "
-            f"aciertos ({res['puntaje']} puntos sobre 100)."
-        )
+                registrar_resultado("cognitivo", st.session_state["resultados_cog"])
+                st.success("Respuestas registradas correctamente.")
 
 
-# --------------------------------------------------------------------
-# MÓDULO: CUESTIONARIO PSICOLABORAL (5 ÍTEMS DEMO)
-# --------------------------------------------------------------------
 def modulo_cuestionario_psicolaboral():
     st.markdown("### 2. Cuestionario Psicolaboral – Versión Demo (5 ítems)")
     st.write(
@@ -298,18 +319,10 @@ def modulo_cuestionario_psicolaboral():
             "promedio": round(promedio, 2),
             "n_items": len(respuestas),
         }
-
-    if st.session_state["resultados_psico"] is not None:
-        res = st.session_state["resultados_psico"]
-        st.info(
-            f"Promedio global del cuestionario: **{res['promedio']}** "
-            f"(sobre 5, en {res['n_items']} ítems)."
-        )
+        registrar_resultado("psico", st.session_state["resultados_psico"])
+        st.success("Respuestas registradas correctamente.")
 
 
-# --------------------------------------------------------------------
-# MÓDULO: INVENTARIO DE ESTILOS LABORALES (5 ÍTEMS DEMO)
-# --------------------------------------------------------------------
 def modulo_inventario_estilos():
     st.markdown("### 3. Inventario de Estilos Laborales – Versión Demo")
     st.write(
@@ -372,26 +385,21 @@ def modulo_inventario_estilos():
     )
 
     if st.button("Registrar preferencias (demo)", key="btn_guardar_estilos"):
-        # Índice demo simple: porcentaje de completitud (siempre 5 ítems acá)
-        puntaje_demo = 100
-        respuestas_estilos["puntaje_demo"] = puntaje_demo
+        respuestas_estilos["puntaje_demo"] = 100  # demo
         st.session_state["resultados_estilos"] = respuestas_estilos
-
-    if st.session_state["resultados_estilos"] is not None:
-        st.success("Preferencias registradas (demo).")
-        st.json(st.session_state["resultados_estilos"])
+        registrar_resultado("estilos", respuestas_estilos)
+        st.success("Preferencias registradas correctamente.")
 
 
 # --------------------------------------------------------------------
-# BLOQUE GENERAL DE PRUEBAS
+# BLOQUE DE PRUEBAS PARA POSTULANTE (SIN GRÁFICOS)
 # --------------------------------------------------------------------
-def mostrar_bloque_pruebas():
+def mostrar_bloque_pruebas_postulante():
     st.markdown("## Módulo de Pruebas Psicolaborales (Demo)")
 
     st.write(
-        "A continuación se presentan, en formato demo, los módulos que conformarán la "
-        "evaluación psicolaboral automatizada. En la versión productiva se integrarán "
-        "bancos completos de ítems e informes automáticos."
+        "Complete los siguientes módulos. En la versión definitiva, los resultados serán "
+        "analizados por el equipo del INE como parte del proceso de selección."
     )
 
     tabs = st.tabs(
@@ -412,36 +420,40 @@ def mostrar_bloque_pruebas():
         modulo_inventario_estilos()
 
     st.info(
-        "En la versión definitiva, los resultados de cada módulo se integrarán en un "
-        "informe psicométrico global para el INE."
+        "Una vez finalizados los módulos, el equipo del INE revisará sus resultados "
+        "en el contexto general del proceso de selección."
     )
 
 
 # --------------------------------------------------------------------
-# RESUMEN GRÁFICO DE RESULTADOS
+# FUNCIONES PARA RESUMEN Y EXPORTACIÓN (VISTA ADMIN)
 # --------------------------------------------------------------------
-def mostrar_resumen_resultados():
-    st.markdown("## Resumen Integrado de Resultados (Demo)")
-
+def obtener_resultados_para_rut(rut: str):
+    datos = st.session_state["resultados_por_postulante"].get(rut)
+    if not datos:
+        return {}
     resultados = {}
 
-    # Cognitivo: ya viene en escala 0–100
-    if st.session_state["resultados_cog"] is not None:
-        resultados["Prueba Cognitiva"] = st.session_state["resultados_cog"]["puntaje"]
+    if datos.get("cognitivo"):
+        resultados["Prueba Cognitiva"] = datos["cognitivo"]["puntaje"]
 
-    # Psicolaboral: promedio 1–5 → 0–100
-    if st.session_state["resultados_psico"] is not None:
-        prom = st.session_state["resultados_psico"]["promedio"]
+    if datos.get("psico"):
+        prom = datos["psico"]["promedio"]
         resultados["Cuestionario Psicolaboral"] = round(prom / 5 * 100)
 
-    # Estilos laborales: índice demo
-    if st.session_state["resultados_estilos"] is not None:
-        resultados["Estilos Laborales (demo)"] = st.session_state["resultados_estilos"].get(
-            "puntaje_demo", 100
-        )
+    if datos.get("estilos"):
+        resultados["Estilos Laborales (demo)"] = datos["estilos"].get("puntaje_demo", 100)
+
+    return resultados
+
+
+def mostrar_resumen_resultados_admin(rut: str):
+    resultados = obtener_resultados_para_rut(rut)
+
+    st.markdown("### Resumen Integrado de Resultados (Demo)")
 
     if not resultados:
-        st.info("Aún no hay resultados suficientes para mostrar el resumen gráfico.")
+        st.info("Este postulante aún no tiene resultados registrados en los módulos demo.")
         return
 
     df = pd.DataFrame(
@@ -449,10 +461,70 @@ def mostrar_resumen_resultados():
             "Módulo": list(resultados.keys()),
             "Puntaje": list(resultados.values()),
         }
-    ).set_index("Módulo")
+    )
 
-    st.bar_chart(df)
-    st.caption("Puntajes en escala 0–100 (demo). No representan resultados finales psicométricos.")
+    chart = (
+        alt.Chart(df)
+        .mark_bar(size=60)
+        .encode(
+            x=alt.X("Módulo", sort=None, axis=alt.Axis(labelAngle=0)),
+            y=alt.Y("Puntaje", scale=alt.Scale(domain=[0, 100])),
+            tooltip=["Módulo", "Puntaje"],
+        )
+        .properties(height=350)
+    )
+
+    st.altair_chart(chart, use_container_width=True)
+    st.caption(
+        "Puntajes en escala 0–100 (demo). No representan resultados finales psicométricos."
+    )
+
+
+def construir_dataframe_resultados_global():
+    filas = []
+    for rut, data in st.session_state["resultados_por_postulante"].items():
+        d = data["datos"]
+        fila = {
+            "rut": rut,
+            "nombre": d.get("nombre"),
+            "correo": d.get("correo"),
+            "telefono": d.get("telefono"),
+            "cargo": d.get("cargo"),
+            "fecha_registro": d.get("fecha_registro"),
+        }
+
+        cog = data.get("cognitivo")
+        if cog:
+            fila["puntaje_cognitivo_0_100"] = cog["puntaje"]
+            fila["aciertos_cognitivo"] = cog["aciertos"]
+            fila["total_items_cognitivo"] = cog["total"]
+        else:
+            fila["puntaje_cognitivo_0_100"] = None
+            fila["aciertos_cognitivo"] = None
+            fila["total_items_cognitivo"] = None
+
+        psico = data.get("psico")
+        if psico:
+            fila["prom_psico_1_5"] = psico["promedio"]
+            fila["n_items_psico"] = psico["n_items"]
+            fila["psico_0_100"] = round(psico["promedio"] / 5 * 100)
+        else:
+            fila["prom_psico_1_5"] = None
+            fila["n_items_psico"] = None
+            fila["psico_0_100"] = None
+
+        estilos = data.get("estilos")
+        if estilos:
+            fila["estilos_0_100_demo"] = estilos.get("puntaje_demo", 100)
+        else:
+            fila["estilos_0_100_demo"] = None
+
+        filas.append(fila)
+
+    if not filas:
+        return pd.DataFrame()
+
+    return pd.DataFrame(filas)
 
 
 # --------------------------------------------------------------------
@@ -478,27 +550,62 @@ def vista_administrador():
                 st.error("Credenciales incorrectas (demo). Intente nuevamente.")
                 st.session_state["admin_autenticado"] = False
 
-    if st.session_state["admin_autenticado"]:
-        st.markdown("### Postulantes registrados en la sesión (demo)")
-        if st.session_state["historial_postulantes"]:
-            st.dataframe(st.session_state["historial_postulantes"])
-        else:
-            st.write("Aún no hay postulantes registrados en esta sesión de demo.")
-
-        st.markdown("### Próximos pasos (demo)")
-        st.write(
-            """
-            - Integrar esta plataforma con el sistema interno del INE.  
-            - Activar generación automática de informes por postulante.  
-            - Habilitar descarga en PDF y exportación a Excel.  
-            - Incorporar filtros por región, cargo y estado del proceso.
-            """
-        )
-    else:
+    if not st.session_state["admin_autenticado"]:
         st.warning(
             "Ingrese con usuario demo para visualizar el panel.\n\n"
             "**Usuario:** `admin`  |  **Clave:** `ine2025`"
         )
+        return
+
+    # Tabla de postulantes
+    st.markdown("### Postulantes registrados en la sesión (demo)")
+    if st.session_state["historial_postulantes"]:
+        st.dataframe(st.session_state["historial_postulantes"])
+    else:
+        st.write("Aún no hay postulantes registrados en esta sesión de demo.")
+
+    # Selección de postulante para ver resultados
+    if st.session_state["resultados_por_postulante"]:
+        st.markdown("### Visualización de resultados por postulante (demo)")
+
+        opciones = []
+        for rut, data in st.session_state["resultados_por_postulante"].items():
+            nombre = data["datos"].get("nombre", "")
+            opciones.append(f"{rut} - {nombre}")
+
+        seleccion = st.selectbox(
+            "Seleccione un postulante para ver sus resultados:",
+            opciones,
+            key="select_postulante_resumen",
+        )
+        rut_sel = seleccion.split(" - ")[0]
+        mostrar_resumen_resultados_admin(rut_sel)
+    else:
+        st.info("Aún no hay resultados asociados a postulantes en esta sesión demo.")
+
+    # Exportación a Excel (CSV)
+    st.markdown("### Exportar resultados (demo)")
+    df_res = construir_dataframe_resultados_global()
+    if df_res.empty:
+        st.write("No hay resultados para exportar todavía.")
+    else:
+        csv = df_res.to_csv(index=False)
+        st.download_button(
+            "Descargar resultados (CSV para Excel)",
+            data=csv.encode("utf-8"),
+            file_name="resultados_psicolaborales_demo.csv",
+            mime="text/csv",
+        )
+
+    st.markdown("### Próximos pasos (demo)")
+    st.write(
+        """
+        - Integrar esta plataforma con el sistema interno del INE.  
+        - Activar generación automática de informes por postulante.  
+        - Habilitar descarga en PDF de informes individuales.  
+        - Incorporar filtros por región, cargo y estado del proceso.
+        """
+    )
 
 
 # --------------------------------------------------------------------
