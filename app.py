@@ -78,7 +78,7 @@ def init_session_state():
     if "historial_postulantes" not in st.session_state:
         st.session_state["historial_postulantes"] = []
 
-    # Estado interno de pruebas (no visible al postulante)
+    # Estado interno de pruebas
     if "indice_cog" not in st.session_state:
         st.session_state["indice_cog"] = 0
     if "resultados_cog" not in st.session_state:
@@ -103,7 +103,7 @@ init_session_state()
 def reset_pruebas_para_nuevo_postulante():
     """Limpia completamente widgets y resultados de pruebas para un nuevo postulante."""
     keys_a_borrar = []
-    for key in st.session_state.keys():
+    for key in list(st.session_state.keys()):
         if key.startswith("cog_") or key.startswith("psico_") or key.startswith("est_"):
             keys_a_borrar.append(key)
 
@@ -234,14 +234,6 @@ def vista_postulante():
     if st.session_state["postulante_registrado"]:
         st.success("Datos registrados. Continúe con las pruebas.")
         mostrar_bloque_pruebas_postulante()
-
-        st.markdown("---")
-        st.info("Si ya finalizó las pruebas de este postulante, puede registrar uno nuevo.")
-        if st.button("Registrar nuevo postulante", key="btn_nuevo_postulante"):
-            st.session_state["datos_postulante"] = None
-            st.session_state["postulante_registrado"] = False
-            reset_pruebas_para_nuevo_postulante()
-            st.experimental_rerun()
     else:
         st.info("Complete el formulario y presione **Iniciar evaluación** para continuar.")
 
@@ -435,8 +427,16 @@ def mostrar_bloque_pruebas_postulante():
     with tabs[2]:
         modulo_inventario_estilos()
 
+    # Mensaje global solo cuando las tres pruebas tienen resultados
+    if (
+        st.session_state["resultados_cog"] is not None
+        and st.session_state["resultados_psico"] is not None
+        and st.session_state["resultados_estilos"] is not None
+    ):
+        st.success("Se han registrado sus respuestas para todas las pruebas. Muchas gracias.")
+
     st.info(
-        "Una vez finalizados los módulos, el equipo del INE revisará sus resultados "
+        "En la versión definitiva, el equipo del INE revisará sus resultados "
         "en el contexto general del proceso de selección."
     )
 
@@ -466,7 +466,7 @@ def obtener_resultados_para_rut(rut: str):
 def mostrar_resumen_resultados_admin(rut: str):
     resultados = obtener_resultados_para_rut(rut)
 
-    st.markdown("### Resumen Integrado de Resultados (Demo)")
+    st.markdown(f"#### Resumen Integrado de Resultados (Demo) – RUT {rut}")
 
     if not resultados:
         st.info("Este postulante aún no tiene resultados registrados en los módulos demo.")
@@ -582,18 +582,19 @@ def vista_administrador():
     if st.session_state["resultados_por_postulante"]:
         st.markdown("### Visualización de resultados por postulante (demo)")
 
-        opciones = []
-        for rut, data in st.session_state["resultados_por_postulante"].items():
-            nombre = data["datos"].get("nombre", "")
-            opciones.append(f"{rut} - {nombre}")
+        opciones = [
+            f"{rut} - {data['datos'].get('nombre','')}"
+            for rut, data in st.session_state["resultados_por_postulante"].items()
+        ]
 
         seleccion = st.selectbox(
             "Seleccione un postulante para ver sus resultados:",
-            opciones,
-            key="select_postulante_resumen",
+            options=opciones,
         )
-        rut_sel = seleccion.split(" - ")[0]
-        mostrar_resumen_resultados_admin(rut_sel)
+
+        if seleccion:
+            rut_sel = seleccion.split(" - ")[0].strip()
+            mostrar_resumen_resultados_admin(rut_sel)
     else:
         st.info("Aún no hay resultados asociados a postulantes en esta sesión demo.")
 
